@@ -1,0 +1,159 @@
+import requests
+import time
+from datetime import datetime
+from typing import List, Dict
+import sqlite3
+
+
+# def vk_response(domain:  str, start: datetime, end: datetime, access_token: str = "") -> Dict:
+#     count = 100
+#     offset = 0
+#     all_items: List[Dict] = []
+#
+#     start_ts = int(start.timestamp())
+#     end_ts = int(end.timestamp())
+#
+#     while True:
+#         params = {
+#             "access_token": access_token,
+#             "offset": offset,
+#             "domain": domain,
+#             "count": count,
+#             "v": "5.199"
+#         }
+#
+#         response = requests.post("https://api.vk.com/method/wall.get", data=params)
+#         if response.status_code != 200:
+#             raise Exception(f"HTTP Error: {response.status_code}")
+#
+#         data = response.json()
+#
+#         if 'error' in data:
+#             raise Exception(f"VK API Error: {data['error']}")
+#
+#         wall_data = data.get('response', {})
+#         items = wall_data.get('items', [])
+#
+#         # Отбор записей по дате
+#         for item in items:
+#             post_date = item.get('date', 0)
+#             if start_ts <= post_date <= end_ts:
+#                 all_items.append(item)
+#                 print(item.get('text', ''))
+#
+#         # Условия выхода
+#         if not items:
+#             break
+#
+#         last_item_date = items[-1].get('date', 0)
+#         if last_item_date < start_ts or offset >= wall_data.get('count', 0):
+#             break
+#
+#         offset += count
+#         time.sleep(0.34)  # чтобы не попасть под ограничение API
+#
+#     return {
+#         "response": {
+#             "count": len(all_items),
+#             "items": all_items
+#         }
+#     }
+
+import sqlite3
+import requests
+import time
+from datetime import datetime
+from typing import List
+
+
+def vk_reposts_check_keywords_to_vkdata(domain: str, start: datetime, end: datetime, db_path: str, access_token: str):
+    start_ts = int(start.timestamp())
+    end_ts = int(end.timestamp())
+    count = 100
+    offset = 0
+
+    # Подключение к БД
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Получаем ключевые слова
+    cursor.execute("SELECT key FROM KeyWords")
+    keywords = [row[0].strip().lower() for row in cursor.fetchall()]
+
+    # Получаем имя по ссылке
+    cursor.execute("SELECT Name FROM VkLinks WHERE Link = ?", (f"https://vk.com/{domain}",))
+    result = cursor.fetchone()
+    name = result[0] if result else domain
+
+    while True:
+        params = {
+            "access_token": access_token,
+            "offset": offset,
+            "domain": domain,
+            "count": count,
+            "v": "5.199"
+        }
+
+        response = requests.post("https://api.vk.com/method/wall.get", data=params)
+        data = response.json()
+
+        if 'error' in data or response.status_code != 200:
+            print("Ошибка VK API:", data.get('error'))
+            break
+
+        items = data.get("response", {}).get("items", [])
+        if not items:
+            break
+
+        for item in items:
+            if 'copy_history' not in item:
+                continue
+
+            post_date = item.get('date', 0)
+            if not (start_ts <= post_date <= end_ts):
+                continue
+
+            repost_text = item['copy_history'][0].get("text", "").lower()
+            value = 1 if any(keyword in repost_text for keyword in keywords) else 0
+
+            # Вставка записи в VkData
+            cursor.execute("""
+                INSERT INTO VkData (Link, Name, type_id, value)
+                VALUES (?, ?, ?, ?)
+            """, (f"https://vk.com/{domain}", name, 1, value))
+
+            print(f"[REPOST] value={value} | text={repost_text[:60]}...")
+
+        offset += count
+        time.sleep(0.34)
+
+        if items[-1].get("date", 0) < start_ts or offset >= data['response'].get('count', 0):
+            break
+
+    conn.commit()
+    conn.close()
+
+
+vk_reposts_check_keywords_to_vkdata(
+    domain="gkb1orenburg",
+    start=datetime(2024, 6, 1),
+    end=datetime(2024, 6, 30),
+    db_path="C:/tgych/vk_database.sqlite",
+    access_token="a7803de0a7803de0a7803de002a4b3f828aa780a7803de0cfc7889602090614ea355967"
+)
+
+
+
+
+
+
+# domain = "gkb1orenburg"
+# start_date = datetime(2024, 6, 1)
+# end_date = datetime(2024, 6, 30)
+# token = "a7803de0a7803de0a7803de002a4b3f828aa780a7803de0cfc7889602090614ea355967"
+
+# result = vk_response(domain, start_date, end_date, token)
+# print("Найдено постов:", result['response']['count'])
+
+
+
