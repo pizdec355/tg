@@ -1,63 +1,7 @@
-import requests
-import time
-from datetime import datetime
-from typing import List, Dict
-import sqlite3
 
 
-# def vk_response(domain:  str, start: datetime, end: datetime, access_token: str = "") -> Dict:
-#     count = 100
-#     offset = 0
-#     all_items: List[Dict] = []
-#
-#     start_ts = int(start.timestamp())
-#     end_ts = int(end.timestamp())
-#
-#     while True:
-#         params = {
-#             "access_token": access_token,
-#             "offset": offset,
-#             "domain": domain,
-#             "count": count,
-#             "v": "5.199"
-#         }
-#
-#         response = requests.post("https://api.vk.com/method/wall.get", data=params)
-#         if response.status_code != 200:
-#             raise Exception(f"HTTP Error: {response.status_code}")
-#
-#         data = response.json()
-#
-#         if 'error' in data:
-#             raise Exception(f"VK API Error: {data['error']}")
-#
-#         wall_data = data.get('response', {})
-#         items = wall_data.get('items', [])
-#
-#         # Отбор записей по дате
-#         for item in items:
-#             post_date = item.get('date', 0)
-#             if start_ts <= post_date <= end_ts:
-#                 all_items.append(item)
-#                 print(item.get('text', ''))
-#
-#         # Условия выхода
-#         if not items:
-#             break
-#
-#         last_item_date = items[-1].get('date', 0)
-#         if last_item_date < start_ts or offset >= wall_data.get('count', 0):
-#             break
-#
-#         offset += count
-#         time.sleep(0.34)  # чтобы не попасть под ограничение API
-#
-#     return {
-#         "response": {
-#             "count": len(all_items),
-#             "items": all_items
-#         }
-#     }
+
+
 
 import sqlite3
 import requests
@@ -147,13 +91,7 @@ vk_reposts_check_keywords_to_vkdata(
 
 
 
-# domain = "gkb1orenburg"
-# start_date = datetime(2024, 6, 1)
-# end_date = datetime(2024, 6, 30)
-# token = "a7803de0a7803de0a7803de002a4b3f828aa780a7803de0cfc7889602090614ea355967"
 
-# result = vk_response(domain, start_date, end_date, token)
-# print("Найдено постов:", result['response']['count'])
 
 
 
