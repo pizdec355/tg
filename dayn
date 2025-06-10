@@ -1,33 +1,15 @@
-
-
-
-
-
-import sqlite3
 import requests
 import time
 from datetime import datetime
 from typing import List
 
 
-def vk_reposts_check_keywords_to_vkdata(domain: str, start: datetime, end: datetime, db_path: str, access_token: str):
-    start_ts = int(start.timestamp())
-    end_ts = int(end.timestamp())
+def get_reposts_from_vk(domain: str, start: datetime, end: datetime, access_token: str) -> List[Dict]:
     count = 100
     offset = 0
-
-    # Подключение к БД
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Получаем ключевые слова
-    cursor.execute("SELECT key FROM KeyWords")
-    keywords = [row[0].strip().lower() for row in cursor.fetchall()]
-
-    # Получаем имя по ссылке
-    cursor.execute("SELECT Name FROM VkLinks WHERE Link = ?", (f"https://vk.com/{domain}",))
-    result = cursor.fetchone()
-    name = result[0] if result else domain
+    start_ts = int(start.timestamp())
+    end_ts = int(end.timestamp())
+    reposts = []
 
     while True:
         params = {
@@ -54,19 +36,12 @@ def vk_reposts_check_keywords_to_vkdata(domain: str, start: datetime, end: datet
                 continue
 
             post_date = item.get('date', 0)
-            if not (start_ts <= post_date <= end_ts):
-                continue
-
-            repost_text = item['copy_history'][0].get("text", "").lower()
-            value = 1 if any(keyword in repost_text for keyword in keywords) else 0
-
-            # Вставка записи в VkData
-            cursor.execute("""
-                INSERT INTO VkData (Link, Name, type_id, value)
-                VALUES (?, ?, ?, ?)
-            """, (f"https://vk.com/{domain}", name, 1, value))
-
-            print(f"[REPOST] value={value} | text={repost_text[:60]}...")
+            if start_ts <= post_date <= end_ts:
+                reposts.append({
+                    "text": item['copy_history'][0].get("text", ""),
+                    "link": f"https://vk.com/{domain}",
+                    "date": post_date
+                })
 
         offset += count
         time.sleep(0.34)
@@ -74,24 +49,48 @@ def vk_reposts_check_keywords_to_vkdata(domain: str, start: datetime, end: datet
         if items[-1].get("date", 0) < start_ts or offset >= data['response'].get('count', 0):
             break
 
+    return reposts
+
+
+import sqlite3
+
+def analyze_reposts_by_keywords(posts: List[Dict], db_path: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Получаем ключевые слова
+    cursor.execute("SELECT key FROM KeyWords")
+    keywords = [row[0].strip().lower() for row in cursor.fetchall()]
+
+    for post in posts:
+        text = post["text"].lower()
+        link = post["link"]
+        found = any(keyword in text for keyword in keywords)
+        value = 1 if found else 0
+
+        # Получаем Name по ссылке
+        cursor.execute("SELECT Name FROM VkLinks WHERE Link = ?", (link,))
+        result = cursor.fetchone()
+        name = result[0] if result else "Неизвестно"
+
+        # Вставка в VkData
+        cursor.execute("""
+            INSERT INTO VkData (Link, Name, type_id, value)
+            VALUES (?, ?, ?, ?)
+        """, (link, name, 1, value))
+
+        print(f"[value={value}] {text[:80]}...")
+
     conn.commit()
     conn.close()
 
+from datetime import datetime
 
-vk_reposts_check_keywords_to_vkdata(
-    domain="gkb1orenburg",
-    start=datetime(2024, 6, 1),
-    end=datetime(2024, 6, 30),
-    db_path="C:/tgych/vk_database.sqlite",
-    access_token="a7803de0a7803de0a7803de002a4b3f828aa780a7803de0cfc7889602090614ea355967"
-)
+domain = "gauz_ookb_voinova"
+start_date = datetime(2024, 6, 1)
+end_date = datetime(2024, 6, 30)
+token = "a7803de0a7803de0a7803de002a4b3f828aa780a7803de0cfc7889602090614ea355967"
+db_path = "C:/tgych/vk_database.sqlite"
 
-
-
-
-
-
-
-
-
-
+posts = get_reposts_from_vk(domain, start_date, end_date, token)
+analyze_reposts_by_keywords(posts, db_path)
